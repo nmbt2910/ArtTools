@@ -1,0 +1,572 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+  View,
+  Text,
+  FlatList,
+  Image,
+  Pressable,
+  TextInput,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+  TouchableOpacity,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { getFavorites, removeFromFavorites, clearAllFavorites } from '../services/favoritesService';
+
+// Helper function to safely convert string/boolean values to boolean
+const toBoolean = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true' || value === '1';
+  }
+  return Boolean(value);
+};
+
+const FavoritesScreen = ({ navigation }) => {
+  const [favorites, setFavorites] = useState([]);
+  const [filteredFavorites, setFilteredFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+
+  const loadFavorites = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getFavorites();
+      setFavorites(data);
+      setFilteredFavorites(data);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load favorites. Please try again.');
+      console.error('Error loading favorites:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadFavorites();
+    setRefreshing(false);
+  }, [loadFavorites]);
+
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
+
+  // Refresh data when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+    }, [loadFavorites])
+  );
+
+  // Filter favorites by search query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = favorites.filter(item =>
+        item.artName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.brand.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredFavorites(filtered);
+    } else {
+      setFilteredFavorites(favorites);
+    }
+  }, [favorites, searchQuery]);
+
+  const toggleSelection = (itemId) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedItems.size === filteredFavorites.length) {
+      // If all are selected, deselect all
+      setSelectedItems(new Set());
+    } else {
+      // Select all visible items
+      setSelectedItems(new Set(filteredFavorites.map(item => item.id)));
+    }
+  };
+
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedItems(new Set());
+  };
+
+  const removeSelectedItems = async () => {
+    if (selectedItems.size === 0) return;
+
+    Alert.alert(
+      'Remove Items',
+      `Are you sure you want to remove ${selectedItems.size} item(s) from favorites?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const promises = Array.from(selectedItems).map(id => removeFromFavorites(id));
+              await Promise.all(promises);
+              
+              setFavorites(prev => prev.filter(item => !selectedItems.has(item.id)));
+              setSelectedItems(new Set());
+              setSelectionMode(false);
+              
+              Alert.alert('Success', 'Items removed from favorites');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to remove items. Please try again.');
+              console.error('Error removing items:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const clearAllFavoritesHandler = () => {
+    Alert.alert(
+      'Clear All Favorites',
+      'Are you sure you want to remove all items from favorites?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await clearAllFavorites();
+              if (success) {
+                setFavorites([]);
+                setFilteredFavorites([]);
+                setSelectedItems(new Set());
+                setSelectionMode(false);
+                Alert.alert('Success', 'All favorites cleared');
+              } else {
+                Alert.alert('Error', 'Failed to clear favorites. Please try again.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Something went wrong. Please try again.');
+              console.error('Error clearing favorites:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const removeSingleItem = async (itemId) => {
+    Alert.alert(
+      'Remove Item',
+      'Are you sure you want to remove this item from favorites?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await removeFromFavorites(itemId);
+              if (success) {
+                setFavorites(prev => prev.filter(item => item.id !== itemId));
+                Alert.alert('Success', 'Item removed from favorites');
+              } else {
+                Alert.alert('Error', 'Failed to remove item. Please try again.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Something went wrong. Please try again.');
+              console.error('Error removing item:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderFavoriteItem = ({ item }) => (
+    <Pressable
+      style={[
+        styles.favoriteCard,
+        selectedItems.has(item.id) && styles.selectedCard,
+      ]}
+      onPress={() => {
+        if (selectionMode) {
+          toggleSelection(item.id);
+        } else {
+          navigation.navigate('Detail', { artTool: item });
+        }
+      }}
+      onLongPress={() => {
+        if (!selectionMode) {
+          setSelectionMode(true);
+          toggleSelection(item.id);
+        }
+      }}
+    >
+      {selectionMode && (
+        <View style={styles.selectionIndicator}>
+          <Ionicons
+            name={selectedItems.has(item.id) ? 'checkmark-circle' : 'ellipse-outline'}
+            size={24}
+            color={selectedItems.has(item.id) ? '#6366f1' : '#9ca3af'}
+          />
+        </View>
+      )}
+      
+      <Image source={{ uri: item.image }} style={styles.favoriteImage} />
+      <View style={styles.favoriteInfo}>
+        <Text style={styles.favoriteName} numberOfLines={2}>
+          {item.artName}
+        </Text>
+        <Text style={styles.favoriteBrand}>{item.brand}</Text>
+        <View style={styles.priceContainer}>
+          <Text style={styles.price}>${Number(item.price) || 0}</Text>
+          {Number(item.limitedTimeDeal) > 0 && (
+            <Text style={styles.deal}>
+              {Math.round(Number(item.limitedTimeDeal) * 100)}% OFF
+            </Text>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366f1" />
+        <Text style={styles.loadingText}>Loading favorites...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#6b7280" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search favorites..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#6b7280"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#6b7280" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Favorites List */}
+      <FlatList
+        data={filteredFavorites}
+        renderItem={renderFavoriteItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="heart-outline" size={64} color="#9ca3af" />
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'No favorites found' : 'No favorites yet'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery
+                ? 'Try adjusting your search criteria'
+                : 'Add some art tools to your favorites to see them here'
+              }
+            </Text>
+          </View>
+        }
+      />
+
+      {/* Action Bar - Fixed at bottom */}
+      {favorites.length > 0 && (
+        <View style={styles.actionBar}>
+          {!selectionMode ? (
+            <TouchableOpacity
+              style={styles.primaryActionButton}
+              onPress={toggleSelectionMode}
+            >
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={20}
+                color="#6366f1"
+              />
+              <Text style={styles.primaryActionButtonText}>
+                Select Items
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.selectionActionContainer}>
+              <TouchableOpacity
+                style={styles.secondaryActionButton}
+                onPress={toggleSelectionMode}
+              >
+                <Ionicons name="close" size={18} color="#6b7280" />
+                <Text style={styles.secondaryActionButtonText}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.primaryActionButton}
+                onPress={selectAll}
+              >
+                <Ionicons 
+                  name={selectedItems.size === filteredFavorites.length ? 'checkmark-done' : 'checkmark-done-outline'} 
+                  size={18} 
+                  color="#6366f1" 
+                />
+                <Text style={styles.primaryActionButtonText}>
+                  {selectedItems.size === filteredFavorites.length ? 'Deselect All' : 'Select All'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dangerActionButton, selectedItems.size === 0 && styles.disabledButton]}
+                onPress={removeSelectedItems}
+                disabled={selectedItems.size === 0}
+              >
+                <Ionicons name="trash" size={18} color="#ffffff" />
+                <Text style={styles.dangerActionButtonText}>
+                  Delete ({selectedItems.size})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    margin: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  actionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 20, // Extra padding for safe area
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  selectionActionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    backgroundColor: '#ffffff',
+    flex: 1,
+  },
+  primaryActionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366f1',
+    marginLeft: 6,
+  },
+  secondaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+    minWidth: 80,
+  },
+  secondaryActionButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginLeft: 4,
+  },
+  dangerActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#ef4444',
+    minWidth: 100,
+  },
+  dangerActionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 4,
+  },
+  disabledButton: {
+    backgroundColor: '#d1d5db',
+    borderColor: '#d1d5db',
+  },
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 100, // Extra padding to account for fixed action bar
+  },
+  favoriteCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    position: 'relative',
+  },
+  selectedCard: {
+    backgroundColor: '#f0f9ff',
+    borderWidth: 2,
+    borderColor: '#6366f1',
+  },
+  selectionIndicator: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 1,
+  },
+  favoriteImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  favoriteInfo: {
+    flex: 1,
+    justifyContent: 'space-between',
+    marginRight: 8, // Add margin to prevent text overlay
+  },
+  favoriteName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+    flex: 1, // Allow text to wrap properly
+  },
+  favoriteBrand: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  price: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#059669',
+    marginRight: 8,
+  },
+  deal: {
+    fontSize: 12,
+    color: '#ef4444',
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+});
+
+export default FavoritesScreen;
+
