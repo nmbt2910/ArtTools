@@ -322,7 +322,7 @@ const HomeScreen = ({ navigation }) => {
           renderItem={renderSortOption}
           keyExtractor={(item) => item.key}
           horizontal
-          showsHorizontalScrollIndicator={true}
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.sortOptionsList}
           scrollEnabled={true}
           bounces={false}

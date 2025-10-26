@@ -37,7 +37,10 @@ const ChatScreen = ({ navigation }) => {
   useEffect(() => {
     if (Platform.OS === 'android') {
       const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
+        // Account for tab bar height and add more padding above keyboard
+        const tabBarHeight = 80;
+        const extraPadding = 30; // Increased padding above keyboard
+        setKeyboardHeight(Math.max(0, e.endCoordinates.height - tabBarHeight + extraPadding));
       });
       const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
         setKeyboardHeight(0);
@@ -184,7 +187,7 @@ const ChatScreen = ({ navigation }) => {
       {Platform.OS === 'ios' ? (
         <KeyboardAvoidingView 
           behavior="padding"
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={-insets.bottom - 20}
         >
           <View style={[styles.inputContainer, { paddingBottom: Math.max(12, insets.bottom) }]}>
             <TextInput
@@ -328,7 +331,7 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 12,
     width: 140,
-    minHeight: 200,
+    height: 200,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -344,23 +347,28 @@ const styles = StyleSheet.create({
   productInfo: {
     flex: 1,
     justifyContent: 'space-between',
+    height: 104,
   },
   productName: {
     fontSize: 12,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 2,
+    marginBottom: 4,
     lineHeight: 14,
+    height: 28,
+    numberOfLines: 2,
   },
   productBrand: {
     fontSize: 10,
     color: '#6b7280',
-    marginBottom: 4,
+    marginBottom: 6,
+    height: 12,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
+    height: 16,
   },
   productPrice: {
     fontSize: 12,
@@ -392,6 +400,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ff3742',
     letterSpacing: 0.5,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingContainer: {
     flexDirection: 'row',
