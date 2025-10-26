@@ -39,7 +39,7 @@ const ChatScreen = ({ navigation }) => {
       const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
         // Account for tab bar height and add more padding above keyboard
         const tabBarHeight = 80;
-        const extraPadding = 30; // Increased padding above keyboard
+        const extraPadding = 28; // Increased padding above keyboard
         setKeyboardHeight(Math.max(0, e.endCoordinates.height - tabBarHeight + extraPadding));
       });
       const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
