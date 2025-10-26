@@ -1,12 +1,12 @@
 import { fetchArtTools } from './apiService';
 
-const GEMINI_API_KEY = 'AIzaSyCHK2WzA87T30velh9mgYxX3RC5be1OPIA';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCHK2WzA87T30velh9mgYxX3RC5be1OPIA';
+const GEMINI_API_URL = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
 
 // Cache for products data to avoid repeated API calls
 let productsCache = null;
 let lastCacheTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = parseInt(process.env.CACHE_DURATION) || 5 * 60 * 1000; // 5 minutes
 
 const getProductsData = async () => {
   const now = Date.now();

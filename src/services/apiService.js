@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://68da41f623ebc87faa2f7a7a.mockapi.io/Art/art';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://68da41f623ebc87faa2f7a7a.mockapi.io/Art/art';
 
 export const fetchArtTools = async () => {
   try {
