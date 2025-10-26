@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getFavorites, removeFromFavorites, clearAllFavorites } from '../services/favoritesService';
@@ -33,6 +34,11 @@ const FavoritesScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
+
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
+  const iconSizeSmall = isCompact ? 16 : 18;
+  const iconSizeMedium = isCompact ? 18 : 20;
 
   const loadFavorites = useCallback(async () => {
     try {
@@ -195,6 +201,21 @@ const FavoritesScreen = ({ navigation }) => {
     );
   };
 
+  const toggleFavorite = async (item) => {
+    try {
+      const success = await removeFromFavorites(item.id);
+      if (success) {
+        setFavorites(prev => prev.filter(favItem => favItem.id !== item.id));
+        setFilteredFavorites(prev => prev.filter(favItem => favItem.id !== item.id));
+      } else {
+        Alert.alert('Error', 'Failed to remove item from favorites. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update favorites. Please try again.');
+      console.error('Error removing from favorites:', error);
+    }
+  };
+
   const renderFavoriteItem = ({ item }) => (
     <Pressable
       style={[
@@ -227,17 +248,39 @@ const FavoritesScreen = ({ navigation }) => {
       
       <Image source={{ uri: item.image }} style={styles.favoriteImage} />
       <View style={styles.favoriteInfo}>
-        <Text style={styles.favoriteName} numberOfLines={2}>
-          {item.artName}
-        </Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.favoriteName} numberOfLines={2}>
+            {item.artName}
+          </Text>
+          <TouchableOpacity
+            onPress={() => toggleFavorite(item)}
+            style={styles.favoriteButton}
+          >
+            <Ionicons
+              name="heart"
+              size={20}
+              color="#ef4444"
+            />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.favoriteBrand}>{item.brand}</Text>
         <View style={styles.priceContainer}>
           <Text style={styles.price}>${Number(item.price) || 0}</Text>
           {Number(item.limitedTimeDeal) > 0 && (
-            <Text style={styles.deal}>
-              {Math.round(Number(item.limitedTimeDeal) * 100)}% OFF
+            <Text style={styles.originalPrice}>
+              ${(Number(item.price) / (1 - Number(item.limitedTimeDeal))).toFixed(2)}
             </Text>
           )}
+        </View>
+        {Number(item.limitedTimeDeal) > 0 && (
+          <Text style={styles.deal}>
+            {Math.round(Number(item.limitedTimeDeal) * 100)}% OFF
+          </Text>
+        )}
+        <View style={styles.cardFooter}>
+          <Text style={styles.glassSurface}>
+            {toBoolean(item.glassSurface) ? 'Glass Surface' : 'Regular Surface'}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -307,48 +350,44 @@ const FavoritesScreen = ({ navigation }) => {
             >
               <Ionicons
                 name="checkmark-circle-outline"
-                size={20}
+                size={iconSizeMedium}
                 color="#6366f1"
               />
-              <Text style={styles.primaryActionButtonText}>
+              <Text style={[styles.primaryActionButtonText, { fontSize: isCompact ? 12 : 14 }]} numberOfLines={1} ellipsizeMode="tail">
                 Select Items
               </Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.selectionActionContainer}>
               <TouchableOpacity
-                style={styles.secondaryActionButton}
+                style={styles.iconActionButton}
                 onPress={toggleSelectionMode}
+                accessibilityLabel="Cancel selection"
               >
-                <Ionicons name="close" size={18} color="#6b7280" />
-                <Text style={styles.secondaryActionButtonText}>
-                  Cancel
-                </Text>
+                <Ionicons name="close" size={iconSizeSmall} color="#6b7280" />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.primaryActionButton}
+                style={[styles.primaryActionButton, styles.primaryGrow]}
                 onPress={selectAll}
               >
                 <Ionicons 
                   name={selectedItems.size === filteredFavorites.length ? 'checkmark-done' : 'checkmark-done-outline'} 
-                  size={18} 
+                  size={iconSizeSmall} 
                   color="#6366f1" 
                 />
-                <Text style={styles.primaryActionButtonText}>
+                <Text style={[styles.primaryActionButtonText, { fontSize: isCompact ? 12 : 14 }]} numberOfLines={1} ellipsizeMode="tail">
                   {selectedItems.size === filteredFavorites.length ? 'Deselect All' : 'Select All'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.dangerActionButton, selectedItems.size === 0 && styles.disabledButton]}
+                style={[styles.iconDangerButton, selectedItems.size === 0 && styles.disabledButton]}
                 onPress={removeSelectedItems}
                 disabled={selectedItems.size === 0}
+                accessibilityLabel={`Delete ${selectedItems.size} selected`}
               >
-                <Ionicons name="trash" size={18} color="#ffffff" />
-                <Text style={styles.dangerActionButtonText}>
-                  Delete ({selectedItems.size})
-                </Text>
+                <Ionicons name="trash" size={iconSizeSmall} color="#ffffff" />
               </TouchableOpacity>
             </View>
           )}
@@ -417,7 +456,6 @@ const styles = StyleSheet.create({
   },
   selectionActionContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
   },
@@ -449,7 +487,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     backgroundColor: '#ffffff',
-    minWidth: 80,
+    minWidth: 0,
+    flexShrink: 1,
   },
   secondaryActionButtonText: {
     fontSize: 14,
@@ -465,13 +504,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 10,
     backgroundColor: '#ef4444',
-    minWidth: 100,
+    minWidth: 0,
+    flexShrink: 1,
   },
   dangerActionButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
     marginLeft: 4,
+  },
+  compactAction: {
+    flexBasis: '32%',
+  },
+  primaryGrow: {
+    flex: 1,
+  },
+  iconActionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#9ca3af',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  iconDangerButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#dc2626',
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   disabledButton: {
     backgroundColor: '#d1d5db',
@@ -523,6 +597,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     flex: 1, // Allow text to wrap properly
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   favoriteBrand: {
     fontSize: 14,
     color: '#6b7280',
@@ -538,6 +616,12 @@ const styles = StyleSheet.create({
     color: '#059669',
     marginRight: 8,
   },
+  originalPrice: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
   deal: {
     fontSize: 12,
     color: '#ef4444',
@@ -546,6 +630,20 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     fontWeight: '600',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  glassSurface: {
+    fontSize: 10,
+    color: '#6b7280',
+    flex: 1,
+  },
+  favoriteButton: {
+    padding: 4,
   },
   emptyContainer: {
     flex: 1,

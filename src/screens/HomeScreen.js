@@ -33,10 +33,19 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('All');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
   const [favorites, setFavorites] = useState(new Set());
 
   // Get unique brands for filtering
   const brands = ['All', ...new Set(artTools.map(tool => tool.brand))];
+
+  // Sorting options
+  const sortOptions = [
+    { key: 'name', label: 'Name', icon: 'text' },
+    { key: 'price', label: 'Price', icon: 'cash' },
+    { key: 'discount', label: 'Discount', icon: 'pricetag' },
+  ];
 
   const loadArtTools = useCallback(async () => {
     try {
@@ -81,7 +90,7 @@ const HomeScreen = ({ navigation }) => {
     }, [loadArtTools])
   );
 
-  // Filter and search functionality
+  // Filter, search, and sort functionality
   useEffect(() => {
     let filtered = artTools;
 
@@ -98,8 +107,47 @@ const HomeScreen = ({ navigation }) => {
       );
     }
 
+    // Sort the filtered results
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a.artName.toLowerCase();
+          bValue = b.artName.toLowerCase();
+          break;
+        case 'price':
+          aValue = Number(a.price) || 0;
+          bValue = Number(b.price) || 0;
+          break;
+        case 'discount':
+          aValue = Number(a.limitedTimeDeal) || 0;
+          bValue = Number(b.limitedTimeDeal) || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
     setFilteredArtTools(filtered);
-  }, [artTools, selectedBrand, searchQuery]);
+  }, [artTools, selectedBrand, searchQuery, sortBy, sortOrder]);
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
+  const handleSortChange = (newSortBy) => {
+    if (sortBy === newSortBy) {
+      toggleSortOrder();
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder('asc');
+    }
+  };
 
   const toggleFavorite = async (artTool) => {
     try {
@@ -141,6 +189,13 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.artToolBrand}>{item.brand}</Text>
           <View style={styles.priceContainer}>
             <Text style={styles.price}>${Number(item.price) || 0}</Text>
+            {Number(item.limitedTimeDeal) > 0 && (
+              <Text style={styles.originalPrice}>
+                ${(Number(item.price) / (1 - Number(item.limitedTimeDeal))).toFixed(2)}
+              </Text>
+            )}
+          </View>
+          <View style={styles.dealContainer}>
             {Number(item.limitedTimeDeal) > 0 && (
               <Text style={styles.deal}>
                 {Math.round(Number(item.limitedTimeDeal) * 100)}% OFF
@@ -186,6 +241,39 @@ const HomeScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  const renderSortOption = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.sortOption,
+        sortBy === item.key && styles.selectedSortOption,
+      ]}
+      onPress={() => handleSortChange(item.key)}
+    >
+      <Ionicons 
+        name={item.icon} 
+        size={16} 
+        color={sortBy === item.key ? '#fff' : '#6b7280'} 
+        style={styles.sortIcon}
+      />
+      <Text
+        style={[
+          styles.sortOptionText,
+          sortBy === item.key && styles.selectedSortOptionText,
+        ]}
+      >
+        {item.label}
+      </Text>
+      {sortBy === item.key && (
+        <Ionicons 
+          name={sortOrder === 'asc' ? 'chevron-up' : 'chevron-down'} 
+          size={14} 
+          color="#fff" 
+          style={styles.sortOrderIcon}
+        />
+      )}
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -223,6 +311,21 @@ const HomeScreen = ({ navigation }) => {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.brandFiltersList}
+        />
+      </View>
+
+      {/* Sort Options */}
+      <View style={styles.sortContainer}>
+        <Text style={styles.sortTitle}>Sort by:</Text>
+        <FlatList
+          data={sortOptions}
+          renderItem={renderSortOption}
+          keyExtractor={(item) => item.key}
+          horizontal
+          showsHorizontalScrollIndicator={true}
+          contentContainerStyle={styles.sortOptionsList}
+          scrollEnabled={true}
+          bounces={false}
         />
       </View>
 
@@ -368,6 +471,16 @@ const styles = StyleSheet.create({
     color: '#059669',
     marginRight: 8,
   },
+  originalPrice: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  dealContainer: {
+    height: 20,
+    marginBottom: 4,
+  },
   deal: {
     fontSize: 12,
     color: '#ef4444',
@@ -407,6 +520,50 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginTop: 8,
     textAlign: 'center',
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  sortTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginRight: 12,
+  },
+  sortOptionsList: {
+    paddingRight: 16,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  selectedSortOption: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  sortIcon: {
+    marginRight: 6,
+  },
+  sortOptionText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  selectedSortOptionText: {
+    color: '#fff',
+  },
+  sortOrderIcon: {
+    marginLeft: 4,
   },
 });
 

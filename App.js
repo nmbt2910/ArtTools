@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './src/screens/HomeScreen';
 import FavoritesScreen from './src/screens/FavoritesScreen';
 import DetailScreen from './src/screens/DetailScreen';
+import ChatScreen from './src/screens/ChatScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -100,6 +101,42 @@ function FavoritesStack() {
   );
 }
 
+// Stack Navigator for AI Chat tab
+function ChatStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="ChatMain" 
+        component={ChatScreen} 
+        options={{ 
+          title: 'AI Assistant',
+          headerStyle: {
+            backgroundColor: '#6366f1',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }} 
+      />
+      <Stack.Screen 
+        name="Detail" 
+        component={DetailScreenWrapper} 
+        options={{ 
+          title: 'Art Tool Details',
+          headerStyle: {
+            backgroundColor: '#6366f1',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
 export default function App() {
   const [tabBarVisible, setTabBarVisible] = useState(true);
 
@@ -116,6 +153,8 @@ export default function App() {
                 iconName = Boolean(focused) ? 'home' : 'home-outline';
               } else if (route.name === 'Favorites') {
                 iconName = Boolean(focused) ? 'heart' : 'heart-outline';
+              } else if (route.name === 'AI Chat') {
+                iconName = Boolean(focused) ? 'chatbubble' : 'chatbubble-outline';
               }
 
               return <Ionicons name={iconName} size={Number(size)} color={color} />;
@@ -146,6 +185,14 @@ export default function App() {
             options={{ 
               headerShown: Boolean(false),
               title: 'Favorites'
+            }} 
+          />
+          <Tab.Screen 
+            name="AI Chat" 
+            component={ChatStack} 
+            options={{ 
+              headerShown: Boolean(false),
+              title: 'AI Chat'
             }} 
           />
         </Tab.Navigator>

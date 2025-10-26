@@ -162,13 +162,18 @@ const DetailScreen = ({ route, navigation }) => {
           <View style={styles.priceContainer}>
             <Text style={styles.price}>${Number(artTool.price) || 0}</Text>
             {Number(artTool.limitedTimeDeal) > 0 && (
-              <View style={styles.dealContainer}>
-                <Text style={styles.dealText}>
-                  {Math.round(Number(artTool.limitedTimeDeal) * 100)}% OFF
-                </Text>
-              </View>
+              <Text style={styles.originalPrice}>
+                ${(Number(artTool.price) / (1 - Number(artTool.limitedTimeDeal))).toFixed(2)}
+              </Text>
             )}
           </View>
+          {Number(artTool.limitedTimeDeal) > 0 && (
+            <View style={styles.dealContainer}>
+              <Text style={styles.dealText}>
+                {Math.round(Number(artTool.limitedTimeDeal) * 100)}% OFF
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Description */}
@@ -370,6 +375,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#059669',
     marginRight: 12,
+  },
+  originalPrice: {
+    fontSize: 20,
+    fontWeight: '500',
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
   },
   dealContainer: {
     backgroundColor: '#fef2f2',
