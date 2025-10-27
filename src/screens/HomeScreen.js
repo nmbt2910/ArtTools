@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchArtTools } from '../services/apiService';
-import { addToFavorites, removeFromFavorites, isFavorite } from '../services/favoritesService';
+import { addToFavorites, removeFromFavorites, getFavoriteIds } from '../services/favoritesService';
 
 // Helper function to safely convert string/boolean values to boolean
 const toBoolean = (value) => {
@@ -56,14 +56,8 @@ const HomeScreen = ({ navigation }) => {
       setArtTools(data);
       setFilteredArtTools(data);
       
-      // Load favorites status
-      const favoriteIds = new Set();
-      for (const tool of data) {
-        const isFav = await isFavorite(tool.id);
-        if (isFav) {
-          favoriteIds.add(tool.id);
-        }
-      }
+      // Load favorites status - optimized to fetch all IDs at once
+      const favoriteIds = await getFavoriteIds();
       setFavorites(favoriteIds);
     } catch (error) {
       Alert.alert('Error', 'Failed to load art tools. Please try again.');
@@ -88,6 +82,21 @@ const HomeScreen = ({ navigation }) => {
     useCallback(() => {
       loadArtTools();
     }, [loadArtTools])
+  );
+
+  // Refresh favorites when tab is focused to ensure consistency
+  useFocusEffect(
+    useCallback(() => {
+      const refreshFavorites = async () => {
+        try {
+          const favoriteIds = await getFavoriteIds();
+          setFavorites(favoriteIds);
+        } catch (error) {
+          console.error('Error refreshing favorites:', error);
+        }
+      };
+      refreshFavorites();
+    }, [])
   );
 
   // Filter, search, and sort functionality
@@ -156,16 +165,16 @@ const HomeScreen = ({ navigation }) => {
       if (isFav) {
         const success = await removeFromFavorites(artTool.id);
         if (success) {
-          setFavorites(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(artTool.id);
-            return newSet;
-          });
+          // Refresh favorites from storage to ensure consistency
+          const favoriteIds = await getFavoriteIds();
+          setFavorites(favoriteIds);
         }
       } else {
         const success = await addToFavorites(artTool);
         if (success) {
-          setFavorites(prev => new Set(prev).add(artTool.id));
+          // Refresh favorites from storage to ensure consistency
+          const favoriteIds = await getFavoriteIds();
+          setFavorites(favoriteIds);
         }
       }
     } catch (error) {

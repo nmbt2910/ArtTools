@@ -65,6 +65,16 @@ export const clearAllFavorites = async () => {
   }
 };
 
+export const getFavoriteIds = async () => {
+  try {
+    const favorites = await getFavorites();
+    return new Set(favorites.map(item => item.id));
+  } catch (error) {
+    console.error('Error getting favorite IDs:', error);
+    return new Set();
+  }
+};
+
 export const isFavorite = async (artToolId) => {
   try {
     const favorites = await getFavorites();
