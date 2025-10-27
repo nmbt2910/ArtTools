@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getFavorites, removeFromFavorites, clearAllFavorites } from '../services/favoritesService';
+import { getFavorites, removeFromFavorites, clearAllFavorites, removeMultipleFromFavorites } from '../services/favoritesService';
 
 // Helper function to safely convert string/boolean values to boolean
 const toBoolean = (value) => {
@@ -124,14 +124,22 @@ const FavoritesScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const promises = Array.from(selectedItems).map(id => removeFromFavorites(id));
-              await Promise.all(promises);
+              // Use batch remove to avoid race conditions
+              const selectedIds = Array.from(selectedItems);
+              console.log('Removing items with IDs:', selectedIds);
+              const success = await removeMultipleFromFavorites(selectedIds);
               
-              setFavorites(prev => prev.filter(item => !selectedItems.has(item.id)));
-              setSelectedItems(new Set());
-              setSelectionMode(false);
-              
-              Alert.alert('Success', 'Items removed from favorites');
+              if (success) {
+                // Update state by filtering out selected items
+                setFavorites(prev => prev.filter(item => !selectedItems.has(item.id)));
+                setFilteredFavorites(prev => prev.filter(item => !selectedItems.has(item.id)));
+                setSelectedItems(new Set());
+                setSelectionMode(false);
+                
+                Alert.alert('Success', 'Items removed from favorites');
+              } else {
+                Alert.alert('Error', 'Failed to remove items. Please try again.');
+              }
             } catch (error) {
               Alert.alert('Error', 'Failed to remove items. Please try again.');
               console.error('Error removing items:', error);
@@ -155,6 +163,7 @@ const FavoritesScreen = ({ navigation }) => {
             try {
               const success = await clearAllFavorites();
               if (success) {
+                // Clear all state immediately
                 setFavorites([]);
                 setFilteredFavorites([]);
                 setSelectedItems(new Set());
@@ -187,6 +196,7 @@ const FavoritesScreen = ({ navigation }) => {
               const success = await removeFromFavorites(itemId);
               if (success) {
                 setFavorites(prev => prev.filter(item => item.id !== itemId));
+                setFilteredFavorites(prev => prev.filter(item => item.id !== itemId));
                 Alert.alert('Success', 'Item removed from favorites');
               } else {
                 Alert.alert('Error', 'Failed to remove item. Please try again.');
@@ -344,19 +354,35 @@ const FavoritesScreen = ({ navigation }) => {
       {favorites.length > 0 && (
         <View style={styles.actionBar}>
           {!selectionMode ? (
-            <TouchableOpacity
-              style={styles.primaryActionButton}
-              onPress={toggleSelectionMode}
-            >
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={iconSizeMedium}
-                color="#6366f1"
-              />
-              <Text style={[styles.primaryActionButtonText, { fontSize: isCompact ? 12 : 14 }]} numberOfLines={1} ellipsizeMode="tail">
-                Select Items
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.normalActionContainer}>
+              <TouchableOpacity
+                style={styles.primaryActionButton}
+                onPress={toggleSelectionMode}
+              >
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={iconSizeMedium}
+                  color="#6366f1"
+                />
+                <Text style={[styles.primaryActionButtonText, { fontSize: isCompact ? 12 : 14 }]} numberOfLines={1} ellipsizeMode="tail">
+                  Select Items
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.dangerActionButton}
+                onPress={clearAllFavoritesHandler}
+              >
+                <Ionicons
+                  name="trash"
+                  size={iconSizeMedium}
+                  color="#ffffff"
+                />
+                <Text style={[styles.dangerActionButtonText, { fontSize: isCompact ? 12 : 14 }]} numberOfLines={1} ellipsizeMode="tail">
+                  Clear All
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.selectionActionContainer}>
               <TouchableOpacity
@@ -453,6 +479,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 8,
+  },
+  normalActionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   selectionActionContainer: {
     flexDirection: 'row',

@@ -41,6 +41,20 @@ export const removeFromFavorites = async (artToolId) => {
   }
 };
 
+export const removeMultipleFromFavorites = async (artToolIds) => {
+  try {
+    const favorites = await getFavorites();
+    console.log('Before batch remove:', favorites.length, 'items');
+    const updatedFavorites = favorites.filter(item => !artToolIds.includes(item.id));
+    console.log('After batch remove:', updatedFavorites.length, 'items');
+    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updatedFavorites));
+    return true;
+  } catch (error) {
+    console.error('Error removing multiple from favorites:', error);
+    return false;
+  }
+};
+
 export const clearAllFavorites = async () => {
   try {
     await AsyncStorage.removeItem(FAVORITES_KEY);
